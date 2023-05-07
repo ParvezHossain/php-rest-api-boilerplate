@@ -22,7 +22,6 @@ class Database {
           $this->pdo = new PDO($this->dsn, $this->user, $this->password);
           $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
           $this->pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
-          echo "Connected";
         } catch (PDOException $e) {
             error_log("Connection failed: " . $e->getMessage(), 0);
             exit("Database connection failed. Please try again later.");

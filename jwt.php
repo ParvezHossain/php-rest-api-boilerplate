@@ -41,3 +41,5 @@ class JWTToken
         return $token->jwt;
     }
 }
+
+echo JWTToken::generateJWTToken();
