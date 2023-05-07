@@ -30,6 +30,8 @@ if (count($tokenArr) > 1) {
     $jwt = $tokenArr[1];
 }
 
+print_r($_SERVER);
+
 // Check if the request path matches the endpoint path
 if (strpos($path, $endpoint_path) === 0) {
     $remaining_path = substr($path, strlen($endpoint_path));
