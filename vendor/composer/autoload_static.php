@@ -34,6 +34,7 @@ class ComposerStaticIniteeb852cfea5a361ada1bd05f3c436d2a
             'Psr\\Container\\' => 14,
             'PhpParser\\' => 10,
             'Parvez\\Playground\\' => 18,
+            'PHPMailer\\PHPMailer\\' => 20,
         ),
         'I' => 
         array (
@@ -93,11 +94,15 @@ class ComposerStaticIniteeb852cfea5a361ada1bd05f3c436d2a
         array (
             0 => __DIR__ . '/../..' . '/src',
         ),
+        'PHPMailer\\PHPMailer\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/phpmailer/phpmailer/src',
+        ),
         'Illuminate\\Support\\' => 
         array (
-            0 => __DIR__ . '/..' . '/illuminate/macroable',
+            0 => __DIR__ . '/..' . '/illuminate/collections',
             1 => __DIR__ . '/..' . '/illuminate/conditionable',
-            2 => __DIR__ . '/..' . '/illuminate/collections',
+            2 => __DIR__ . '/..' . '/illuminate/macroable',
             3 => __DIR__ . '/..' . '/illuminate/support',
         ),
         'Illuminate\\Hashing\\' => 

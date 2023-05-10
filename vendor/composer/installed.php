@@ -3,7 +3,7 @@
         'name' => 'parvez/playground',
         'pretty_version' => 'dev-master',
         'version' => 'dev-master',
-        'reference' => 'a1bccb37b58c15e9eeede39d6125dca9c399242b',
+        'reference' => 'c26c2a9c93a0abb54bc27f60cafa22e353fb3abc',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -112,7 +112,7 @@
         'parvez/playground' => array(
             'pretty_version' => 'dev-master',
             'version' => 'dev-master',
-            'reference' => 'a1bccb37b58c15e9eeede39d6125dca9c399242b',
+            'reference' => 'c26c2a9c93a0abb54bc27f60cafa22e353fb3abc',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
@@ -135,6 +135,15 @@
             'install_path' => __DIR__ . '/../phar-io/version',
             'aliases' => array(),
             'dev_requirement' => true,
+        ),
+        'phpmailer/phpmailer' => array(
+            'pretty_version' => 'v6.8.0',
+            'version' => '6.8.0.0',
+            'reference' => 'df16b615e371d81fb79e506277faea67a1be18f1',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../phpmailer/phpmailer',
+            'aliases' => array(),
+            'dev_requirement' => false,
         ),
         'phpunit/php-code-coverage' => array(
             'pretty_version' => '10.1.1',

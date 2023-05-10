@@ -16,6 +16,7 @@
     },
     "require": {
         "firebase/php-jwt": "^6.4",
-        "illuminate/hashing": "^10.10"
+        "illuminate/hashing": "^10.10",
+        "phpmailer/phpmailer": "^6.8"
     }
 }
