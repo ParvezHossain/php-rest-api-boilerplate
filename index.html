@@ -9,6 +9,10 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
 
     <style>
+      .login-btn {
+        background-color: #007bff;
+        color: #fff;
+      }
       .get-btn {
         background-color: green;
         color: white;
@@ -28,9 +32,16 @@
         background-color: orange;
         color: white;
       }
+      button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+      }
     </style>
   </head>
   <body>
+    <button id="login" class="login-btn">Login</button>
     <button id="getUser" class="get-btn">Get Users</button>
     <button id="saveUser" class="post-btn">Save User</button>
     <button id="deleteUser" class="delete-btn">Delete User</button>
@@ -38,6 +49,27 @@
 
     <script>
       $(document).ready(function () {
+        $("#login").click(function () {
+          $.ajax({
+            url: "index.php/v1/login",
+            type: "POST",
+            data: JSON.stringify({
+              user_name: "phossain",
+              password: "phossain",
+            }),
+            headers: {
+              "Content-Type": "application/json",
+            },
+            success: function (token) {
+              localStorage.setItem("php-token", token);
+              console.log(token);
+            },
+            error: function (xhr, status, error) {
+              console.log(error);
+            },
+          });
+        });
+
         $("#getUser").click(function () {
           $.ajax({
             url: "index.php/v1/users/",
@@ -64,13 +96,13 @@
             },
             data: JSON.stringify({
               name: "Parvez Hossain",
-              user_name: 'phossain',
+              user_name: "phossain",
               gender: "Male",
               email: "parvezhossain724@gmail.com",
-              password: 'phossain',
+              password: "phossain",
             }),
             success: function (response) {
-              localStorage.setItem("php-token", response.token);
+              console.log(response);
             },
             error: function (xhr, status, error) {
               console.log(error);
@@ -81,7 +113,7 @@
 
       $("#updateUser").click(function () {
         $.ajax({
-          url: "index.php/v1/users/4",
+          url: "index.php/v1/users/1",
           type: "PUT",
           headers: {
             Authorization: "Bearer " + localStorage.getItem("php-token"),
@@ -89,7 +121,7 @@
           },
           data: JSON.stringify({
             name: "Parvez Hossain",
-            user_name: 'phossain_v2',
+            user_name: "phossain_v2",
             gender: "Male",
             email: "parvezhossain724@gmail.com",
           }),
@@ -104,7 +136,7 @@
 
       $("#deleteUser").click(function () {
         $.ajax({
-          url: "index.php/v1/users/4",
+          url: "index.php/v1/users/1",
           type: "DELETE",
           headers: {
             Authorization: "Bearer " + localStorage.getItem("php-token"),

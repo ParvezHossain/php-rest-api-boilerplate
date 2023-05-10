@@ -1,2 +1,18 @@
 
 [2023-05-10 Wed 06:42:27] : Missing required parameters
+[2023-05-10 Wed 09:58:00] : sfaf
+[2023-05-10 Wed 10:15:01] : PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'laravel.userss' doesn't exist in C:\laragon\www\user.php:159
+Stack trace:
+#0 C:\laragon\www\user.php(159): PDO->prepare('UPDATE userss S...')
+#1 C:\laragon\www\index.php(150): User->updateUser(Object(PDO), Array)
+#2 {main}
+[2023-05-10 Wed 10:15:11] : PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'laravel.userss' doesn't exist in C:\laragon\www\user.php:159
+Stack trace:
+#0 C:\laragon\www\user.php(159): PDO->prepare('UPDATE userss S...')
+#1 C:\laragon\www\index.php(150): User->updateUser(Object(PDO), Array)
+#2 {main}
+[2023-05-10 Wed 10:16:31] : PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'laravel.userss' doesn't exist in C:\laragon\www\user.php:159
+Stack trace:
+#0 C:\laragon\www\user.php(159): PDO->prepare('UPDATE userss S...')
+#1 C:\laragon\www\index.php(149): User->updateUser(Object(PDO), Array)
+#2 {main}

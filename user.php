@@ -1,6 +1,9 @@
 <?php
 require_once 'jwt.php';
 require_once 'Logger/logger.php';
+
+use Illuminate\Hashing\BcryptHasher;
+
 // Create Logger instance
 $logger = Logger::getLogger();
 class User
@@ -29,28 +32,50 @@ class User
             If a PDOException occurs while inserting the user data into the database, it will throw an HTTP 500 error along with the message 'Database error: ' and the error message.
             If an Exception occurs, it will throw an HTTP error code along with the error message. 
 */
-    public function registration($pdo, $name, $user_name, $gender, $email, $password): string
+    public function registration(PDO $pdo, $name, $user_name, $gender, $email, $password): array
     {
         try {
+            $hasher = new BcryptHasher();
+            $hashedPassword = $hasher->make($password);
             $stmt = $pdo->prepare('INSERT INTO users (name, user_name, gender, email, password) VALUES (:name, :user_name, :gender, :email, :password)');
-            $stmt->execute([$name, $user_name, $gender, $email, $password]);
-            $user_id = $pdo->lastInsertId();
-            return JWTToken::generateJWTToken([$user_id, $name]);
+            $stmt->execute([$name, $user_name, $gender, $email, $hashedPassword]);
+
+            $user = [];
+
+            $user['name'] = $name;
+            $user['user_name'] = $user_name;
+            $user['gender'] = $gender;
+            $user['email'] = $email;
+            return $user;
         } catch (PDOException $e) {
             $this->logger->log($e);
-            http_response_code(500);
-            echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
-            exit();
+            $this->sendError('Database error: ' . $e->getMessage(), 500);
         } catch (Exception $e) {
             $this->logger->log($e);
-            http_response_code($e->getCode());
-            echo json_encode(['error' => $e->getMessage()]);
-            exit();
+            $this->sendError('Error: ' . $e->getMessage(), 500);
         }
     }
-    public function login()
+
+    public function login(PDO $pdo, array $postData): string
     {
+        try {
+            $user = $this->getUserByUsername($pdo, $postData['user_name']);
+
+            if ($user && password_verify($postData['password'], $user['password'])) {
+                return JWTToken::generateJWTToken([$user['name'], $user['user_name']]);
+            } else {
+                $this->sendError('Invalid Credentials', 401);
+            }
+        } catch (PDOException $e) {
+            $this->logger->log($e);
+            $this->sendError('Database error: ' . $e->getMessage(), 500);
+        } catch (Exception $e) {
+            $this->logger->log($e);
+            $this->sendError('Error: ' . $e->getMessage(), 500);
+        }
     }
+
+
 
     /* 
     Function Name: fetchSingleUser
@@ -77,12 +102,10 @@ class User
             return $user ?: null;
         } catch (PDOException $e) {
             $this->logger->log($e);
-            http_response_code(500);
-            echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
+            $this->sendError('Database error: ' . $e->getMessage(), 500);
         } catch (Exception $e) {
             $this->logger->log($e);
-            http_response_code(500);
-            echo json_encode(['error' => 'Error: ' . $e->getMessage()]);
+            $this->sendError('Error: ' . $e->getMessage(), 500);
         }
     }
 
@@ -103,12 +126,10 @@ class User
             return $users;
         } catch (PDOException $e) {
             $this->logger->log($e);
-            http_response_code(500);
-            echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
+            $this->sendError('Database error: ' . $e->getMessage(), 500);
         } catch (Exception $e) {
             $this->logger->log($e);
-            http_response_code(500);
-            echo json_encode(['error' => 'Error: ' . $e->getMessage()]);
+            $this->sendError('Error: ' . $e->getMessage(), 500);
         }
     }
 
@@ -131,7 +152,7 @@ class User
     Exception Handling:
         The updateUser function catches any PDOException or Exception that might occur during the execution of the SQL query. If there is a database error, the function returns an HTTP response code 500 with an error message indicating that there was a database error. If there is a server error, the function returns an HTTP response code 500 with an error message indicating that there was a server error. If the user is not found, the function returns an HTTP response code 404 with an error message indicating that the user was not found.
 */
-    public function updateUser($pdo, array $data): array
+    public function updateUser(PDO $pdo, array $data): array
     {
         try {
             $stmt = $pdo->prepare(
@@ -150,19 +171,13 @@ class User
             }
         } catch (PDOException $e) {
             $this->logger->log($e);
-            http_response_code(500);
-            echo json_encode([
-                'error' => 'Database error: ' . $e->getMessage(),
-            ]);
+            $this->sendError('Database error: ' . $e->getMessage(), 500);
         } catch (Exception $e) {
             $this->logger->log($e);
-            http_response_code(500);
-            echo json_encode([
-                'error' => 'Server error: ' . $e->getMessage(),
-            ]);
+            $this->sendError('Error: ' . $e->getMessage(), 500);
         }
     }
-/* 
+    /* 
     Function deleteUser() takes two parameters: a PDO object and a user ID. It deletes a user record from the database that matches the given user ID and returns an HTTP status code.
 
 If the deletion is successful, it returns a 204 status code indicating that there is no content to return. If the user ID is not found in the database, it returns a 404 status code indicating that the requested resource was not found. If there is a database error, it returns a 500 status code indicating that there is an internal server error.
@@ -171,7 +186,7 @@ The function uses a prepared statement to delete the user record from the databa
 
 If there is a PDO exception, the function sets the HTTP response code to 500 and returns an error message in JSON format.
 */
-    public function deleteUser($pdo, $userId)
+    public function deleteUser(PDO $pdo, int $userId)
     {
         try {
             $stmt = $pdo->prepare('DELETE FROM users WHERE id = :id');
@@ -185,10 +200,27 @@ If there is a PDO exception, the function sets the HTTP response code to 500 and
             }
         } catch (PDOException $e) {
             $this->logger->log($e);
-            http_response_code(500); // Internal Server Error
-            json_encode([
-                'error' => 'Unable to delete user: ' . $e->getMessage(),
-            ]);
+            $this->sendError('Database error: ' . $e->getMessage(), 500);
+        } catch (Exception $e) {
+            $this->logger->log($e);
+            $this->sendError('Error: ' . $e->getMessage(), 500);
         }
+    }
+
+
+    private function getUserByUsername(PDO $pdo, string $username): ?array
+    {
+        $stmt = $pdo->prepare('SELECT * FROM USERS WHERE user_name = ? LIMIT 1');
+        $stmt->execute([$username]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return ($stmt->rowCount() > 0) ? $user : null;
+    }
+
+    public function sendError(string $message, int $statusCode): void
+    {
+        http_response_code($statusCode);
+        echo json_encode(['error' => $message]);
+        exit();
     }
 }

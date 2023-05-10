@@ -39,12 +39,14 @@ $tokenArr = explode(' ', $authHeader);
 // Split the api uri
 $segments = explode('/', $path);
 
+// echo '<pre>';
+// print_r($segments); die();
+
 if (isset($segments[2]) && $segments[2] !== $api_version) {
     http_response_code(400);
     echo json_encode(['error' => 'Unsupported API version']);
     exit(1);
 }
-
 // Check if the request path matches the endpoint path
 if (isset($segments[3]) && $segments[3] === $endpoint_path) {
     // Handle the CRUD operations based on the HTTP method
@@ -53,33 +55,24 @@ if (isset($segments[3]) && $segments[3] === $endpoint_path) {
 
             /* This code block handles a GET request to retrieve users from the database. It starts by verifying the JWT token passed with the request, then checks if a specific user ID has been requested. If a user ID has been provided, the code fetches that user's details from the database and returns it as a JSON-encoded response. If no specific ID has been requested, the code fetches all users' details from the database and returns them as a JSON-encoded response. */
 
-            try {
-                require 'jwt.php';
-                require 'user.php';
-                $user = new User();
+            require 'jwt.php';
+            require 'user.php';
+            $user = new User();
 
-                JWTToken::verifyJWTToken($tokenArr[1]);
+            JWTToken::verifyJWTToken($tokenArr[1]);
 
-                if (isset($segments[4]) && !empty(trim($segments[4]))) {
-                    // Sanitize the user id
-                    $userId = filter_var($segments[4], FILTER_SANITIZE_NUMBER_INT);
-                    $data = $user->fetchSingleUser($pdo, $userId);
-                    if (!$data) {
-                        http_response_code(404);
-                        echo json_encode(['error' => 'User not found']);
-                    } else {
-                        echo json_encode($data);
-                    }
+            if (isset($segments[4]) && !empty(trim($segments[4]))) {
+                // Sanitize the user id
+                $userId = filter_var($segments[4], FILTER_SANITIZE_NUMBER_INT);
+                $data = $user->fetchSingleUser($pdo, $userId);
+                if (!$data) {
+                    $user->sendError('User not found', 404);
                 } else {
-                    $data =  $user->fetchAllUsers($pdo);
                     echo json_encode($data);
                 }
-            } catch (PDOException $e) {
-                http_response_code(500);
-                echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
-            } catch (Exception $e) {
-                http_response_code(500);
-                echo json_encode(['error' => 'Error: ' . $e->getMessage()]);
+            } else {
+                $data =  $user->fetchAllUsers($pdo);
+                echo json_encode($data);
             }
             break;
 
@@ -97,19 +90,22 @@ if (isset($segments[3]) && $segments[3] === $endpoint_path) {
             $email = filter_var($data['email'], FILTER_SANITIZE_EMAIL);
             $password = $data['password'];
 
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $user->sendError("{$email} is not a valid email address", 400);
+                exit();
+            }
+
             require 'user.php';
             $user = new User();
 
             // validate the request body
             if (empty($name) || empty($gender) || empty($email) || empty($user_name) || empty($password)) {
-                $user->logger->log('Missing required parameters');
-                http_response_code(400);
-                echo json_encode(['error' => 'Missing required parameters']);
+                $user->sendError('Missing required parameters', 404);
                 exit();
             }
 
-            $token = $user->registration($pdo, $name, $user_name, $gender, $email, $password);
-            echo json_encode(['token' => $token]);
+            $user = $user->registration($pdo, $name, $user_name, $gender, $email, $password);
+            echo json_encode(['user' => $user]);
 
             break;
 
@@ -141,9 +137,7 @@ if (isset($segments[3]) && $segments[3] === $endpoint_path) {
 
             // validate the request body
             if (empty($name) || empty($gender) || empty($email)) {
-                $user->logger->log('Missing required parameters');
-                http_response_code(400);
-                echo json_encode(['error' => 'Missing required parameters']);
+                $user->sendError('Missing required parameters', 404);
                 exit();
             }
 
@@ -152,18 +146,15 @@ if (isset($segments[3]) && $segments[3] === $endpoint_path) {
             if ($data) {
                 echo json_encode($data);
             } else {
-                http_response_code(404);
-                echo json_encode([
-                    'error' => 'User not found',
-                ]);
+                $user->sendError('User not found', 404);
             }
             break;
 
         case 'DELETE':
             // Handle PUT request
             if (!isset($segments[4])) {
-                http_response_code(400);
-                echo json_encode(['error' => 'Missing User ID']);
+                $user->sendError('Resource not found!', 404);
+                exit();
             }
             // Delete a single user
             $userId = filter_var($segments[4], FILTER_SANITIZE_NUMBER_INT);
@@ -174,18 +165,42 @@ if (isset($segments[3]) && $segments[3] === $endpoint_path) {
                 http_response_code(204); // Not Found
                 echo json_encode(['error' => 'User delete successfully.']);
             } else {
-                http_response_code(404); // Not Found
-                echo json_encode(['error' => 'User not found.']);
+                $user->sendError('User not found', 404);
             }
             break;
-
         default:
-            // Method not supported
-            http_response_code(405);
-            echo json_encode(['error' => 'Method not supported']);
+            $user->sendError('Method not supported', 405);
+            exit();
             break;
     }
+} elseif (isset($segments[3]) && $segments[3] === 'login') {
+    if ($method === 'POST') {
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        // sanitize input
+        $user_name = htmlspecialchars($data['user_name'], ENT_QUOTES, 'UTF-8');
+        $password = $data['password'];
+
+        $postData = [
+            'user_name' => $user_name,
+            'password' => $password
+        ];
+
+        // validate the request body
+        if (empty($user_name) || empty($password)) {
+            $user->sendError('Invalid Credentials', 401);
+            exit();
+        }
+
+        require 'user.php';
+        $user = new User();
+        $data = $user->login($pdo, $postData);
+        echo json_encode($data);
+    } else {
+        $user->sendError('Resource not found!', 404);
+        exit();
+    }
 } else {
-    http_response_code(404);
-    echo json_encode(['error' => 'Resource not found!']);
+    $user->sendError('Resource not found!', 404);
+    exit();
 }

@@ -15,6 +15,7 @@
         "phpunit/phpunit": "^10.1"
     },
     "require": {
-        "firebase/php-jwt": "^6.4"
+        "firebase/php-jwt": "^6.4",
+        "illuminate/hashing": "^10.10"
     }
 }
