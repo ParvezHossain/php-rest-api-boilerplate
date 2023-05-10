@@ -40,7 +40,7 @@
       $(document).ready(function () {
         $("#getUser").click(function () {
           $.ajax({
-            url: "index.php/v1/users",
+            url: "index.php/v1/users/",
             type: "GET",
             headers: {
               Authorization: "Bearer " + localStorage.getItem("php-token"),
@@ -64,8 +64,10 @@
             },
             data: JSON.stringify({
               name: "Parvez Hossain",
+              user_name: 'phossain',
               gender: "Male",
               email: "parvezhossain724@gmail.com",
+              password: 'phossain',
             }),
             success: function (response) {
               localStorage.setItem("php-token", response.token);
@@ -79,7 +81,7 @@
 
       $("#updateUser").click(function () {
         $.ajax({
-          url: "index.php/v1/users/23",
+          url: "index.php/v1/users/4",
           type: "PUT",
           headers: {
             Authorization: "Bearer " + localStorage.getItem("php-token"),
@@ -87,6 +89,7 @@
           },
           data: JSON.stringify({
             name: "Parvez Hossain",
+            user_name: 'phossain_v2',
             gender: "Male",
             email: "parvezhossain724@gmail.com",
           }),
@@ -101,7 +104,7 @@
 
       $("#deleteUser").click(function () {
         $.ajax({
-          url: "index.php/v1/users/22",
+          url: "index.php/v1/users/4",
           type: "DELETE",
           headers: {
             Authorization: "Bearer " + localStorage.getItem("php-token"),

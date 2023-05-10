@@ -4,7 +4,11 @@
 require_once('connection.php');
 require_once('helpers.php');
 require_once('config.php');
+require_once 'Logger/logger.php';
 require __DIR__ . "/vendor/autoload.php";
+
+// Create Logger instance
+$logger = Logger::getLogger();
 
 // TODO
 // use this variable
@@ -56,7 +60,7 @@ if (isset($segments[3]) && $segments[3] === $endpoint_path) {
 
                 JWTToken::verifyJWTToken($tokenArr[1]);
 
-                if (isset($segments[4])) {
+                if (isset($segments[4]) && !empty(trim($segments[4]))) {
                     // Sanitize the user id
                     $userId = filter_var($segments[4], FILTER_SANITIZE_NUMBER_INT);
                     $data = $user->fetchSingleUser($pdo, $userId);
@@ -89,87 +93,68 @@ if (isset($segments[3]) && $segments[3] === $endpoint_path) {
             // sanitize input
             $name = htmlspecialchars($data['name'], ENT_QUOTES, 'UTF-8');
             $gender = htmlspecialchars($data['gender'], ENT_QUOTES, 'UTF-8');
+            $user_name = htmlspecialchars($data['user_name'], ENT_QUOTES, 'UTF-8');
             $email = filter_var($data['email'], FILTER_SANITIZE_EMAIL);
+            $password = $data['password'];
+
+            require 'user.php';
+            $user = new User();
 
             // validate the request body
-            if (empty($name) || empty($gender) || empty($email)) {
+            if (empty($name) || empty($gender) || empty($email) || empty($user_name) || empty($password)) {
+                $user->logger->log('Missing required parameters');
                 http_response_code(400);
                 echo json_encode(['error' => 'Missing required parameters']);
                 exit();
             }
 
-            try {
-                // insert the user into the database
-                require 'user.php';
-                $user = new User();
-                $token = $user->registration($pdo, $name, $gender, $email);
-                echo json_encode(['token' => $token]);
-            } catch (PDOException $e) {
-                http_response_code(500);
-                echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
-                exit();
-            } catch (Exception $e) {
-                http_response_code($e->getCode());
-                echo json_encode(['error' => $e->getMessage()]);
-                exit();
-            }
+            $token = $user->registration($pdo, $name, $user_name, $gender, $email, $password);
+            echo json_encode(['token' => $token]);
+
             break;
 
         case 'PUT':
             // Handle PUT request
-            if (!isset($segments[4])) {
-                header('HTTP/1.1 400 Bad Request');
-                die('Missing user ID');
+            if (!isset($segments[4]) && empty(trim($segments[4]))) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Missing User ID']);
             }
             $userId = filter_var($segments[4], FILTER_SANITIZE_NUMBER_INT);
-
             // validate the request body
             $data = json_decode(file_get_contents('php://input'), true);
 
             // sanitize input
             $name = htmlspecialchars($data['name'], ENT_QUOTES, 'UTF-8');
+            $user_name = htmlspecialchars($data['user_name'], ENT_QUOTES, 'UTF-8');
             $gender = htmlspecialchars($data['gender'], ENT_QUOTES, 'UTF-8');
             $email = filter_var($data['email'], FILTER_SANITIZE_EMAIL);
 
             $postData = [
                 'userId' => $userId,
                 'name' => $name,
+                'user_name' => $user_name,
                 'gender' => $gender,
                 'email' => $email,
             ];
+            require 'user.php';
+            $user = new User();
 
             // validate the request body
             if (empty($name) || empty($gender) || empty($email)) {
+                $user->logger->log('Missing required parameters');
                 http_response_code(400);
                 echo json_encode(['error' => 'Missing required parameters']);
                 exit();
             }
 
-            try {
-                require 'user.php';
-                $user = new User();
+            $data = $user->updateUser($pdo, $postData);
 
-                $data = $user->updateUser($pdo, $postData);
-
-                if ($data) {
-                    echo json_encode($data);
-                } else {
-                    http_response_code(404);
-                    echo json_encode([
-                        'error' => 'User not found',
-                    ]);
-                }
-            } catch (PDOException $e) {
-                $pdo->rollBack();
-                http_response_code(500);
-                header('HTTP/1.1 500 Internal Server Error');
+            if ($data) {
+                echo json_encode($data);
+            } else {
+                http_response_code(404);
                 echo json_encode([
-                    'error' => 'Server error: ' . $e->getMessage(),
-                ]);
-            } catch (Exception $e) {
-                http_response_code(500);
-                echo json_encode([
-                    'error' => 'Database error: ' . $e->getMessage(),
+                    'error' => 'User not found',
                 ]);
             }
             break;
@@ -177,27 +162,20 @@ if (isset($segments[3]) && $segments[3] === $endpoint_path) {
         case 'DELETE':
             // Handle PUT request
             if (!isset($segments[4])) {
-                header('HTTP/1.1 400 Bad Request');
-                die('Missing user ID');
+                http_response_code(400);
+                echo json_encode(['error' => 'Missing User ID']);
             }
-            try {
-                // Delete a single user
-                $userId = filter_var($segments[4], FILTER_SANITIZE_NUMBER_INT);
-                require 'user.php';
-                $user = new User();
-                $data = $user->deleteUser($pdo, $userId);
-                if ($data === 204) {
-                    http_response_code(204); // Not Found
-                    echo json_encode(['error' => 'User delete successfully.']);
-                } else {
-                    http_response_code(404); // Not Found
-                    echo json_encode(['error' => 'User not found.']);
-                }
-            } catch (PDOException $e) {
-                http_response_code(500); // Internal Server Error
-                json_encode([
-                    'error' => 'Unable to delete user: ' . $e->getMessage(),
-                ]);
+            // Delete a single user
+            $userId = filter_var($segments[4], FILTER_SANITIZE_NUMBER_INT);
+            require 'user.php';
+            $user = new User();
+            $data = $user->deleteUser($pdo, $userId);
+            if ($data === 204) {
+                http_response_code(204); // Not Found
+                echo json_encode(['error' => 'User delete successfully.']);
+            } else {
+                http_response_code(404); // Not Found
+                echo json_encode(['error' => 'User not found.']);
             }
             break;
 
