@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+
+    <style>
+      .get-btn {
+        background-color: green;
+        color: white;
+      }
+
+      .post-btn {
+        background-color: blue;
+        color: white;
+      }
+
+      .delete-btn {
+        background-color: red;
+        color: white;
+      }
+
+      .put-btn {
+        background-color: orange;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="getUser" class="get-btn">Get Users</button>
+    <button id="saveUser" class="post-btn">Save User</button>
+    <button id="deleteUser" class="delete-btn">Delete User</button>
+    <button id="updateUser" class="put-btn">Update User</button>
+
+    <script>
+      $(document).ready(function () {
+        $("#getUser").click(function () {
+          $.ajax({
+            url: "index.php/v1/users",
+            type: "GET",
+            headers: {
+              Authorization: "Bearer " + localStorage.getItem("php-token"),
+              "Content-Type": "application/json",
+            },
+            success: function (res) {
+              console.log(res);
+            },
+            error: function (xhr, status, error) {
+              console.log(error);
+            },
+          });
+        });
+
+        $("#saveUser").click(function () {
+          $.ajax({
+            url: "index.php/v1/users",
+            type: "POST",
+            headers: {
+              "Content-type": "application/json",
+            },
+            data: JSON.stringify({
+              name: "Parvez Hossain",
+              gender: "Male",
+              email: "parvezhossain724@gmail.com",
+            }),
+            success: function (response) {
+              localStorage.setItem("php-token", response.token);
+            },
+            error: function (xhr, status, error) {
+              console.log(error);
+            },
+          });
+        });
+      });
+
+      $("#updateUser").click(function () {
+        $.ajax({
+          url: "index.php/v1/users/23",
+          type: "PUT",
+          headers: {
+            Authorization: "Bearer " + localStorage.getItem("php-token"),
+            "Content-Type": "application/json",
+          },
+          data: JSON.stringify({
+            name: "Parvez Hossain",
+            gender: "Male",
+            email: "parvezhossain724@gmail.com",
+          }),
+          success: function (response) {
+            console.log("User updated successfully:", response);
+          },
+          error: function (xhr, status, error) {
+            console.error("Error updating user:", error);
+          },
+        });
+      });
+
+      $("#deleteUser").click(function () {
+        $.ajax({
+          url: "index.php/v1/users/22",
+          type: "DELETE",
+          headers: {
+            Authorization: "Bearer " + localStorage.getItem("php-token"),
+            "Content-Type": "application/json",
+          },
+          success: function (result) {
+            console.log("User deleted successfully");
+          },
+          error: function (xhr, status, error) {
+            console.log("Error deleting user: " + error);
+          },
+        });
+      });
+    </script>
+  </body>
+</html>

@@ -11,7 +11,7 @@ header('Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Ac
 header('Content-Type: application/json');
 
 // Define the API version and endpoint path
-$api_version = 'v1';
+$api_version = '/v1';
 $endpoint_path = '/users';
 
 // Define the HTTP request method
@@ -20,6 +20,11 @@ $method = $_SERVER['REQUEST_METHOD'];
 // Parse the request URI
 $request_uri = $_SERVER['REQUEST_URI'];
 $path = parse_url($request_uri, PHP_URL_PATH);
+echo $path . PHP_EOL;
+$segments = explode('/', $path);
+echo '<pre>';
+print_r($segments);
+die();
 
 // Check for JWT token
 $jwt = null;

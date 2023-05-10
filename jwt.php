@@ -2,44 +2,80 @@
 
 require __DIR__ . "/vendor/autoload.php";
 
+use Firebase\JWT\ExpiredException;
 use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+use Firebase\JWT\SignatureInvalidException;
 
 class JWTToken
 {
     private string $jwt;
 
-    public function __construct(string $secret_key, string $issuer_claim, string $audience_claim, int $issuedat_claim, int $notbefore_claim, int $expire_claim, array $data)
+    /**
+     * Constructor method for creating JWT tokens.
+     * 
+     * @param array $data An array containing the data to be encoded in the JWT token
+     */
+    public function __construct(array $data)
     {
+        // Get the current timestamp
+        $date = new DateTimeImmutable();
+        // Set the token expiration time to 59 minutes from the current time
+        $expire_at = $date->modify('+59 minutes')->getTimestamp();
 
-        // This is for reference purpose
-        /* 
-        $secret_key = "YOUR_SECRET_KEY";
-        $issuer_claim = "THE_ISSUER"; // this can be the servername
-        $audience_claim = "THE_AUDIENCE";
-        $issuedat_claim = time(); // issued at
-        $notbefore_claim = $issuedat_claim + 10; //not before in seconds
-        $expire_claim = $issuedat_claim + 60; // expire time in seconds
-        */
-
+        // Build the token payload
         $token = [
-            "iss" => $issuer_claim,
-            "aud" => $audience_claim,
-            "iat" => $issuedat_claim,
-            "nbf" => $notbefore_claim,
-            "exp" => $expire_claim,
-            "data" => $data,
+            'iat'  => $date->getTimestamp(),         // Issued at: time when the token was generated
+            'iss'  => 'localhost',                   // Issuer
+            'nbf'  => $date->getTimestamp(),         // Not before
+            'exp'  => $expire_at,                    // Expire
+            "data" => $data,                         // Data to be encoded in the token
         ];
 
-        // Encode the token with HS256 algorithm using your secret key
-        $jwt = JWT::encode($token, $secret_key, "HS256");
-        $this->jwt = $jwt;
+        // Encode the token with HS512 algorithm using the secret key and save it to the class property
+        $this->jwt = JWT::encode($token, SECRET_KEY, HASH_ALGORITHM);
     }
 
-    public static function generateJWTToken(string $secret_key, string $issuer_claim, string $audience_claim, int $issuedat_claim, int $notbefore_claim, int $expire_claim, array $data): string
+    /**
+     * Method for generating JWT tokens.
+     * 
+     * @param array $data An array containing the data to be encoded in the JWT token
+     * @return string The generated JWT token
+     */
+    public static function generateJWTToken(array $data): string
     {
-        $token = new self($secret_key, $issuer_claim, $audience_claim, $issuedat_claim, $notbefore_claim, $expire_claim, $data);
+        $token = new self($data);
         return $token->jwt;
     }
-}
 
-echo JWTToken::generateJWTToken();
+    /**
+     * Method for verifying JWT tokens.
+     * 
+     * @param string $token The JWT token to be verified
+     */
+    public static function verifyJWTToken(string $token): void
+    {
+        $now = new DateTimeImmutable();
+
+        try {
+            // Decode the token using the secret key and check if it has expired
+            $decoded = JWT::decode($token, new Key(SECRET_KEY, HASH_ALGORITHM));
+            if ($decoded->nbf > $now->getTimestamp() || $decoded->exp < $now->getTimestamp()) {
+                http_response_code(401);
+                echo json_encode(['error' => 'Token expired']);
+            }
+        } catch (ExpiredException $e) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Token expired']);
+            exit(1);
+        } catch (SignatureInvalidException $e) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Token signature is invalid']);
+            exit(1);
+        } catch (Exception $e) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            exit(1);
+        }
+    }
+}

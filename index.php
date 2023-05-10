@@ -1,12 +1,19 @@
 <?php
 
+// Import dependencies
 require_once('connection.php');
 require_once('helpers.php');
+require_once('config.php');
+require __DIR__ . "/vendor/autoload.php";
+
+// TODO
+// use this variable
+// PATH_INFO
 
 
 // Define the API version and endpoint path
 $api_version = 'v1';
-$endpoint_path = '/users';
+$endpoint_path = 'users';
 
 // Set headers
 set_headers();
@@ -20,77 +27,65 @@ $request_uri = $_SERVER['REQUEST_URI'];
 $path = parse_url($request_uri, PHP_URL_PATH);
 
 // Check for JWT token
-$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+
+// Retrieve the Authorization header
+$authHeader = isset(getallheaders()['Authorization']) ? getallheaders()['Authorization'] : '';
 $tokenArr = explode(' ', $authHeader);
 
-echo $path . PHP_EOL;
-echo $endpoint_path; die();
+// Split the api uri
+$segments = explode('/', $path);
 
+if (isset($segments[2]) && $segments[2] !== $api_version) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Unsupported API version']);
+    exit(1);
+}
 
 // Check if the request path matches the endpoint path
-if (strpos($path, $endpoint_path) === 0) {
-    $remaining_path = substr($path, strlen($endpoint_path));
-
-    // Split the remaining path into an array of segments
-    $segments = explode('/', $remaining_path);
-
-    // Check the API version
-    if (isset($segments[1]) && $segments[1] !== $api_version) {
-        header('HTTP/1.1 400 Bad Request');
-        die('Unsupported API version');
-    }
-
+if (isset($segments[3]) && $segments[3] === $endpoint_path) {
     // Handle the CRUD operations based on the HTTP method
-
     switch ($method) {
         case 'GET':
-            // Handle GET request
+
+            /* This code block handles a GET request to retrieve users from the database. It starts by verifying the JWT token passed with the request, then checks if a specific user ID has been requested. If a user ID has been provided, the code fetches that user's details from the database and returns it as a JSON-encoded response. If no specific ID has been requested, the code fetches all users' details from the database and returns them as a JSON-encoded response. */
+
             try {
+                require 'jwt.php';
+                require 'user.php';
+                $user = new User();
 
-                if (!$jwt) {
-                    http_response_code(401);
-                    echo json_encode(['error' => 'Unauthorized']);
-                    exit();
-                }
+                JWTToken::verifyJWTToken($tokenArr[1]);
 
-                // Verify JWT token
-                try {
-                    $decoded = JWT::decode($jwt, 'secret_key', array('HS356'));
-                } catch (Exception $e) {
-                    http_response_code(401);
-                    echo json_encode(['error' => 'Unauthorized']);
-                }
-
-                if (isset($segments[2])) {
-                    // Get a single user by ID
-                    $user_id = filter_var($segments[2], FILTER_SANITIZE_NUMBER_INT);
-                    $stmt = $pdo->prepare('SELECT * FROM USERS WHERE id = ?');
-                    $stmt->execute([$user_id]);
-                    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-                    if (!$user) {
-                        header('HTTP/1.1 404 Not Found');
+                if (isset($segments[4])) {
+                    // Sanitize the user id
+                    $userId = filter_var($segments[4], FILTER_SANITIZE_NUMBER_INT);
+                    $data = $user->fetchSingleUser($pdo, $userId);
+                    if (!$data) {
+                        http_response_code(404);
                         echo json_encode(['error' => 'User not found']);
                     } else {
-                        echo json_encode($user);
+                        echo json_encode($data);
                     }
                 } else {
-                    $stmt = $pdo->query('SELECT * FROM users');
-                    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                    echo json_encode($users);
+                    $data =  $user->fetchAllUsers($pdo);
+                    echo json_encode($data);
                 }
             } catch (PDOException $e) {
                 http_response_code(500);
                 echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
             } catch (Exception $e) {
                 http_response_code(500);
-                echo json_encode(['error' => 'Error: ' . $e->getMessage()]);    
+                echo json_encode(['error' => 'Error: ' . $e->getMessage()]);
             }
             break;
 
         case 'POST':
-            // Handle POST request
-            $data = json_decode(file_get_contents('php://input'), true);
 
+            /* The code handles a POST request to add a new user to a database. The request body is parsed to extract the name, gender, and email fields. The input is sanitized using htmlspecialchars and filter_var functions, respectively. If any of the required parameters are missing, a 400 Bad Request response is returned.
+
+            If all required parameters are present, the user data is inserted into the database. If the insertion is successful, the newly created user is retrieved from the database using the lastInsertId method. The user's data is then sanitized, and a JSON Web Token (JWT) is generated for the user. Finally, a JSON response is returned containing the JWT. */
+
+            $data = json_decode(file_get_contents('php://input'), true);
             // sanitize input
             $name = htmlspecialchars($data['name'], ENT_QUOTES, 'UTF-8');
             $gender = htmlspecialchars($data['gender'], ENT_QUOTES, 'UTF-8');
@@ -104,39 +99,16 @@ if (strpos($path, $endpoint_path) === 0) {
             }
 
             try {
-                $pdo->beginTransaction();
                 // insert the user into the database
-                $stmt = $pdo->prepare(
-                    'INSERT INTO users (name, gender, email) VALUES (:name, :gender, :email)'
-                );
-                $stmt->execute([$name, $gender, $email]);
-                $stmt->execute();
-
-                // retrieve the newly created user from the database
-                $user_id = $pdo->lastInsertId();
-                $stmt = $conn->prepare('SELECT * FROM users WHERE id = :id');
-                $stmt->bindParam(':id', $user_id);
-                $stmt->execute();
-                $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                $pdo->commit();
-
-                // sanitize the user data before returning it
-                $user['name'] = htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8');
-                $user['gender'] = htmlspecialchars($user['gender'], ENT_QUOTES, 'UTF-8');
-                $user['email'] = filter_var($user['email'], FILTER_SANITIZE_EMAIL);
-
-                require __DIR__ . 'jwt.php';
-                $user['token'] = JWTToken::generateJWTToken('secret_key', 'Server', 'Audience', time(), $issuedat_claim + 10, $issuedat_claim + 60, [$user_id, $user['name']]);
-
-                echo json_encode($user);
+                require 'user.php';
+                $user = new User();
+                $token = $user->registration($pdo, $name, $gender, $email);
+                echo json_encode(['token' => $token]);
             } catch (PDOException $e) {
-                $pdo->rollback();
                 http_response_code(500);
                 echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
                 exit();
             } catch (Exception $e) {
-                $pdo->rollback();
                 http_response_code($e->getCode());
                 echo json_encode(['error' => $e->getMessage()]);
                 exit();
@@ -145,19 +117,26 @@ if (strpos($path, $endpoint_path) === 0) {
 
         case 'PUT':
             // Handle PUT request
-            if (!isset($segments[2])) {
+            if (!isset($segments[4])) {
                 header('HTTP/1.1 400 Bad Request');
                 die('Missing user ID');
             }
-            $user_id = filter_var($segments[2], FILTER_SANITIZE_NUMBER_INT);
+            $userId = filter_var($segments[4], FILTER_SANITIZE_NUMBER_INT);
 
             // validate the request body
             $data = json_decode(file_get_contents('php://input'), true);
-            
+
             // sanitize input
             $name = htmlspecialchars($data['name'], ENT_QUOTES, 'UTF-8');
             $gender = htmlspecialchars($data['gender'], ENT_QUOTES, 'UTF-8');
             $email = filter_var($data['email'], FILTER_SANITIZE_EMAIL);
+
+            $postData = [
+                'userId' => $userId,
+                'name' => $name,
+                'gender' => $gender,
+                'email' => $email,
+            ];
 
             // validate the request body
             if (empty($name) || empty($gender) || empty($email)) {
@@ -167,72 +146,54 @@ if (strpos($path, $endpoint_path) === 0) {
             }
 
             try {
-                $pdo->beginTransaction();
-                // update the user in the database
-                $stmt = $pdo->prepare(
-                    'UPDATE users SET name = :name, gender = :gender, email = :email WHERE id = :id'
-                );
-                $stmt->bindParam(':id', $data['id']);
-                $stmt->bindParam(':name', $data['name']);
-                $stmt->bindParam(':gender', $data['gender']);
-                $stmt->bindParam(':email', $data['email']);
-                $stmt->execute();
+                require 'user.php';
+                $user = new User();
 
-                // retrieve the updated user from the database
-                $stmt = $pdo->prepare('SELECT * FROM users WHERE id = :id');
-                $stmt->bindParam(':id', $user_id);
-                $stmt->execute();
-                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                $data = $user->updateUser($pdo, $postData);
 
-                $pdo->commit();
-
-                // sanitize the user data before returning it
-                $user['name'] = htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8');
-                $user['gender'] = htmlspecialchars($user['gender'], ENT_QUOTES, 'UTF-8');
-                $user['email'] = filter_var($user['email'], FILTER_SANITIZE_EMAIL);
-
-                if (!$user) {
-                    header('HTTP/1.1 404 Not Found');
-                    die('User not found');
+                if ($data) {
+                    echo json_encode($data);
                 } else {
-                    echo json_encode($user);
+                    http_response_code(404);
+                    echo json_encode([
+                        'error' => 'User not found',
+                    ]);
                 }
             } catch (PDOException $e) {
                 $pdo->rollBack();
+                http_response_code(500);
                 header('HTTP/1.1 500 Internal Server Error');
+                echo json_encode([
+                    'error' => 'Server error: ' . $e->getMessage(),
+                ]);
+            } catch (Exception $e) {
+                http_response_code(500);
                 echo json_encode([
                     'error' => 'Database error: ' . $e->getMessage(),
                 ]);
             }
-
             break;
 
         case 'DELETE':
             // Handle PUT request
-            if (!isset($segments[2])) {
+            if (!isset($segments[4])) {
                 header('HTTP/1.1 400 Bad Request');
                 die('Missing user ID');
             }
-
             try {
-                $pdo->beginTransaction();
                 // Delete a single user
-                $user_id = filter_var($segments[2], FILTER_SANITIZE_NUMBER_INT);
-                $stmt = $pdo->prepare('DELETE FROM users WHERE id = :id');
-                $stmt->bindParam(':id', $user_id);
-                $stmt->execute();
-
-                $pdo->commit();
-
-                $affectedRows = $stmt->rowCount();
-                if ($affectedRows > 0) {
-                    http_response_code(204); // No Content
+                $userId = filter_var($segments[4], FILTER_SANITIZE_NUMBER_INT);
+                require 'user.php';
+                $user = new User();
+                $data = $user->deleteUser($pdo, $userId);
+                if ($data === 204) {
+                    http_response_code(204); // Not Found
+                    echo json_encode(['error' => 'User delete successfully.']);
                 } else {
                     http_response_code(404); // Not Found
                     echo json_encode(['error' => 'User not found.']);
                 }
             } catch (PDOException $e) {
-                $pdo->rollBack();
                 http_response_code(500); // Internal Server Error
                 json_encode([
                     'error' => 'Unable to delete user: ' . $e->getMessage(),
